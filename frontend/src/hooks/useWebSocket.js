@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { API_BASE } from '../api'
 
+// Hosts with no traffic fade after FADE_AFTER_MS and leave the views after HIDE_AFTER_MS.
+export const FADE_AFTER_MS = 60_000
+export const HIDE_AFTER_MS = 300_000
+
 export function useWebSocket(url) {
   const ws = useRef(null)
   const [nodes, setNodes] = useState({})
@@ -17,6 +21,7 @@ export function useWebSocket(url) {
   const [whitelistedIps, setWhitelistedIps] = useState([])
   const [media, setMedia] = useState({ mic: [], camera: [] })
   const bwRef = useRef({})  // { secondTimestamp: totalBytes }
+  const lastSeen = useRef({})  // { nodeId: ms of last packet }
 
   // Tick every second: build bandwidth array from buckets
   useEffect(() => {
@@ -60,6 +65,7 @@ export function useWebSocket(url) {
             else nodeMap[n.id] = n
           })
           msg.edges.forEach(e => { edgeMap[e.id] = e })
+          lastSeen.current = Object.fromEntries(Object.keys(nodeMap).map(id => [id, Date.now()]))
           setNodes(nodeMap)
           setEdges(edgeMap)
           setLanDevices(deviceMap)
@@ -67,6 +73,7 @@ export function useWebSocket(url) {
         }
 
         if (msg.type === 'update') {
+          lastSeen.current[msg.node.id] = Date.now()
           setNodes(prev => ({ ...prev, [msg.node.id]: msg.node }))
           setEdges(prev => ({ ...prev, [msg.edge.id]: msg.edge }))
           setPackets(prev => [msg.packet, ...prev].slice(0, 100))
@@ -118,6 +125,7 @@ export function useWebSocket(url) {
           })
           const edgeMap = {}
           ;(msg.edges || []).forEach(e => { edgeMap[e.id] = e })
+          lastSeen.current = Object.fromEntries(Object.keys(nodeMap).map(id => [id, Date.now()]))
           setNodes(nodeMap)
           setEdges(edgeMap)
           setLanDevices(deviceMap)
@@ -170,5 +178,5 @@ export function useWebSocket(url) {
     setWhitelistedIps(data.whitelisted_ips)
   }
 
-  return { nodes, edges, lanDevices, packets, alerts, unread, clearUnread, status, bandwidth, capturing, toggleCapture, portFilter, updatePortFilter, excludedProcesses, updateProcessFilter, whitelistedIps, updateIpWhitelist, media }
+  return { nodes, edges, lanDevices, packets, alerts, unread, clearUnread, status, bandwidth, capturing, toggleCapture, portFilter, updatePortFilter, excludedProcesses, updateProcessFilter, whitelistedIps, updateIpWhitelist, media, lastSeen }
 }

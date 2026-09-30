@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from capture.sniffer import Packet, PacketSniffer
 from capture.media_monitor import MediaMonitor, MediaState
 from classifier.traffic import classify
-from resolver.dns_geo import enrich_ip
+from resolver.dns_geo import enrich_ip, resolve_self_geo
 from scanner.arp_scanner import ARPScanner, Device
 from detection.anomaly import AnomalyDetector
 import storage.db as db
@@ -84,6 +84,7 @@ async def _handle_packet(pkt: Packet) -> None:
             "city": geo.get("city"),
             "lat": geo.get("lat"),
             "lon": geo.get("lon"),
+            "anycast": bool(geo.get("anycast")),
             "org": geo.get("org"),
             "category": category.category,
             "color": category.color,
@@ -291,6 +292,11 @@ async def get_devices() -> dict:
 @app.get("/alerts")
 async def get_alerts() -> dict:
     return {"alerts": detector.history[-100:]}
+
+@app.get("/me")
+async def my_location() -> dict:
+    return await asyncio.get_running_loop().run_in_executor(None, resolve_self_geo)
+
 
 @app.get("/media")
 async def get_media() -> dict:

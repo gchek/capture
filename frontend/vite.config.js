@@ -14,6 +14,7 @@ export default defineConfig({
       '/timeline': { target: 'http://localhost:8000' },
       '/capture':  { target: 'http://localhost:8000' },
       '/media':    { target: 'http://localhost:8000' },
+      '/me':       { target: 'http://localhost:8000' },
     },
   },
 })

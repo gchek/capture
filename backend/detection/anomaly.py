@@ -32,7 +32,12 @@ SUSPICIOUS_PORTS = {
     9050: "Tor SOCKS",
 }
 
-BEACON_THRESHOLD = 30      # packets/min to same IP → suspicious beacon
+# Beaconing = outbound bursts at near-constant intervals. Packet rate alone flags every busy HTTPS stream.
+BEACON_GAP = 2.0           # seconds of silence that separate one burst from the next
+BEACON_MIN_BURSTS = 10     # bursts needed before judging regularity
+BEACON_MAX_JITTER = 0.15   # max stdev/mean of the burst intervals
+BEACON_MIN_INTERVAL = 5.0  # mean seconds between bursts (faster = ordinary streaming)
+BEACON_MAX_INTERVAL = 900.0
 VOLUME_SPIKE_FACTOR = 8    # 8x average bytes → spike
 COOLDOWN = 60              # seconds before re-alerting the same key
 
@@ -105,7 +110,8 @@ class AnomalyDetector:
     def __init__(self):
         self._seen_hosts: set[str] = set()
         self._seen_process_conns: set[str] = set()
-        self._pkt_times: dict[str, deque] = defaultdict(lambda: deque(maxlen=200))
+        self._burst_starts: dict[str, deque] = defaultdict(lambda: deque(maxlen=BEACON_MIN_BURSTS * 3))
+        self._last_out: dict[str, float] = {}
         self._host_bytes_window: dict[str, deque] = defaultdict(lambda: deque(maxlen=60))
         self._cooldowns: dict[str, float] = {}
         self.history: list[dict] = []
@@ -128,7 +134,7 @@ class AnomalyDetector:
         alerts += self._check_new_host(remote_ip, geo)
         alerts += self._check_suspicious_process(pkt, remote_ip, geo)
         alerts += self._check_suspicious_port(pkt, remote_ip, geo)
-        alerts += self._check_beacon(remote_ip, geo)
+        alerts += self._check_beacon(remote_ip, pkt, geo)
         alerts += self._check_volume_spike(remote_ip, pkt.size, geo)
         alerts += self._check_media_exfil(pkt, remote_ip, geo)
 
@@ -218,14 +224,24 @@ class AnomalyDetector:
             details={"port": port, "reason": reason, "ip": remote_ip},
         )]
 
-    def _check_beacon(self, remote_ip: str, geo: dict) -> list[Alert]:
-        if remote_ip in BEACON_WHITELIST:
+    def _check_beacon(self, remote_ip: str, pkt: Packet, geo: dict) -> list[Alert]:
+        if remote_ip in BEACON_WHITELIST or pkt.direction != "out":
             return []
         now = time.time()
-        dq = self._pkt_times[remote_ip]
-        dq.append(now)
-        recent = sum(1 for t in dq if now - t < 60)
-        if recent < BEACON_THRESHOLD:
+        last = self._last_out.get(remote_ip)
+        self._last_out[remote_ip] = now
+        if last is not None and now - last < BEACON_GAP:
+            return []  # same burst
+        starts = self._burst_starts[remote_ip]
+        starts.append(now)
+        if len(starts) < BEACON_MIN_BURSTS:
+            return []
+        intervals = [b - a for a, b in zip(starts, list(starts)[1:])]
+        mean = sum(intervals) / len(intervals)
+        if not BEACON_MIN_INTERVAL <= mean <= BEACON_MAX_INTERVAL:
+            return []
+        stdev = (sum((x - mean) ** 2 for x in intervals) / len(intervals)) ** 0.5
+        if stdev / mean > BEACON_MAX_JITTER:
             return []
         key = f"beacon:{remote_ip}"
         if not self._cooldown_ok(key, cooldown=300):
@@ -234,9 +250,9 @@ class AnomalyDetector:
         return [Alert(
             type="BEACON",
             severity="warning",
-            message=f"Comportement beacon détecté : {recent} paquets/min vers {label}",
+            message=f"Comportement beacon détecté : une connexion toutes les {mean:.0f}s vers {label}",
             node_id=remote_ip,
-            details={"ip": remote_ip, "rate": recent},
+            details={"ip": remote_ip, "interval": round(mean, 1), "jitter": round(stdev / mean, 3), "bursts": len(starts)},
         )]
 
     def _check_volume_spike(self, remote_ip: str, size: int, geo: dict) -> list[Alert]:

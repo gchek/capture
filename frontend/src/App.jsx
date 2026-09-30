@@ -5,13 +5,18 @@ import MapView from './map/MapView'
 import Sidebar from './components/Sidebar'
 import { AlertBell, AlertPanel, AlertToasts } from './components/AlertPanel'
 import Timeline from './components/Timeline'
-import { useWebSocket } from './hooks/useWebSocket'
+import { useWebSocket, HIDE_AFTER_MS } from './hooks/useWebSocket'
 import { computePrivacyScore } from './scoring/privacy'
 import { WS_URL } from './api'
 import { useT } from './i18n'
 
 export default function App() {
-  const { nodes, edges, lanDevices, packets, alerts, unread, clearUnread, status, bandwidth, capturing, toggleCapture, portFilter, updatePortFilter, excludedProcesses, updateProcessFilter, whitelistedIps, updateIpWhitelist, media } = useWebSocket(WS_URL)
+  const { nodes, edges, lanDevices, packets, alerts, unread, clearUnread, status, bandwidth, capturing, toggleCapture, portFilter, updatePortFilter, excludedProcesses, updateProcessFilter, whitelistedIps, updateIpWhitelist, media, lastSeen } = useWebSocket(WS_URL)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 10_000)
+    return () => clearInterval(id)
+  }, [])
   const [selected, setSelected] = useState(null)
   const [view, setView] = useState('graph')
   const [showAlerts, setShowAlerts] = useState(false)
@@ -22,27 +27,37 @@ export default function App() {
     [alerts]
   )
 
+  // Ids of hosts with no traffic for HIDE_AFTER_MS; the joined string keeps the memo stable between ticks.
+  const idleKey = useMemo(() => {
+    const cutoff = Date.now() - HIDE_AFTER_MS
+    return Object.keys(nodes)
+      .filter(id => id !== 'local' && (lastSeen.current[id] ?? Date.now()) < cutoff)
+      .sort().join(',')
+  }, [nodes, tick])
+  const idleIds = useMemo(() => new Set(idleKey ? idleKey.split(',') : []), [idleKey])
+
   const filteredNodes = useMemo(() => {
-    if (excludedProcesses.length === 0) return nodes
+    if (excludedProcesses.length === 0 && idleIds.size === 0) return nodes
     const out = {}
     for (const [id, node] of Object.entries(nodes)) {
       if (id === 'local') { out[id] = node; continue }
+      if (idleIds.has(id)) continue
       const procs = node.processes ? Object.keys(node.processes) : []
       if (procs.length > 0 && procs.every(p => excludedProcesses.includes(p))) continue
       out[id] = node
     }
     return out
-  }, [nodes, excludedProcesses])
+  }, [nodes, excludedProcesses, idleIds])
 
   const filteredEdges = useMemo(() => {
-    if (excludedProcesses.length === 0) return edges
+    if (excludedProcesses.length === 0 && idleIds.size === 0) return edges
     const visibleIds = new Set([...Object.keys(filteredNodes), ...Object.keys(lanDevices)])
     const out = {}
     for (const [id, edge] of Object.entries(edges)) {
       if (visibleIds.has(edge.source) && visibleIds.has(edge.target)) out[id] = edge
     }
     return out
-  }, [edges, filteredNodes, lanDevices, excludedProcesses])
+  }, [edges, filteredNodes, lanDevices, excludedProcesses, idleIds])
 
   const filteredPackets = useMemo(() =>
     excludedProcesses.length === 0
@@ -95,7 +110,7 @@ export default function App() {
             />
           )}
           {view === 'map' && (
-            <MapView nodes={filteredNodes} onNodeClick={setSelected} />
+            <MapView nodes={filteredNodes} lastSeen={lastSeen} tick={tick} onNodeClick={setSelected} />
           )}
 
           <div style={{

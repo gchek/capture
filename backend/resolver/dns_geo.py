@@ -83,6 +83,22 @@ def resolve_geo_ipapi(ip: str) -> dict:
     return {}
 
 
+@lru_cache(maxsize=1)
+def resolve_self_geo() -> dict:
+    """Where this machine's public IP is located (ip-api answers for the caller when no IP is given)."""
+    try:
+        req = urllib.request.Request("http://ip-api.com/json/?fields=status,city,country,lat,lon",
+                                     headers={"User-Agent": "pcybox-orbis/1.0"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read())
+        if data.get("status") == "success":
+            return {"city": data.get("city"), "country": data.get("country"),
+                    "lat": data.get("lat"), "lon": data.get("lon")}
+    except Exception:
+        pass
+    return {}
+
+
 @lru_cache(maxsize=2048)
 def resolve_geo(ip: str) -> dict:
     geo = resolve_geo_maxmind(ip)
@@ -91,10 +107,22 @@ def resolve_geo(ip: str) -> dict:
     return resolve_geo_ipapi(ip)
 
 
+# Anycast networks answer from the nearest edge, so their registered location is meaningless.
+_ANYCAST_ORG_WORDS = ("cloudflare", "public dns", "quad9", "opendns", "fastly")
+
+
+def _mark_anycast(geo: dict) -> dict:
+    org = (geo.get("org") or "").lower()
+    if not any(w in org for w in _ANYCAST_ORG_WORDS):
+        return geo
+    return {**geo, "anycast": True, "lat": None, "lon": None, "country": "nearest edge server",
+            "country_code": None, "city": "Anycast"}
+
+
 async def enrich_ip(ip: str) -> dict:
     loop = asyncio.get_event_loop()
     hostname = await loop.run_in_executor(None, resolve_hostname, ip)
-    geo = await loop.run_in_executor(None, resolve_geo, ip)
+    geo = _mark_anycast(await loop.run_in_executor(None, resolve_geo, ip))
     return {
         "ip": ip,
         "hostname": hostname,

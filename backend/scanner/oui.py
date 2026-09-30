@@ -51,7 +51,52 @@ DEVICE_TYPE_COLORS: dict[str, str] = {
 }
 
 
+# macOS ships the full IEEE OUI registry (~35k vendors); the table above is the fallback elsewhere.
+_SYSTEM_OUI = "/System/Library/Frameworks/AudioVideoBridging.framework/Versions/A/Resources/oui.plist"
+_system_oui: dict[str, str] | None = None
+
+_TYPE_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
+    ("router", ("technicolor", "tp-link", "netgear", "cisco", "linksys", "asus", "zyxel", "huawei",
+                "ubiquiti", "mikrotik", "sagemcom", "arris", "d-link", "avm", "sercomm", "compal")),
+    ("phone",  ("apple", "samsung", "xiaomi", "oneplus", "oppo", "vivo", "motorola")),
+    ("tv",     ("lg electronics", "vizio", "tcl", "hisense", "roku")),
+    ("iot",    ("espressif", "raspberry", "amazon", "google", "sonos", "ezviz", "hikvision", "tuya",
+                "shelly", "philips", "signify", "sony", "nintendo", "ring", "nest")),
+    ("pc",     ("intel", "realtek", "microsoft", "dell", "lenovo", "hewlett", "liteon", "azurewave")),
+]
+
+
+def _load_system_oui() -> dict[str, str]:
+    global _system_oui
+    if _system_oui is None:
+        try:
+            import plistlib
+            with open(_SYSTEM_OUI, "rb") as f:
+                _system_oui = {k: v for k, v in plistlib.load(f).items() if v}
+        except Exception:
+            _system_oui = {}
+    return _system_oui
+
+
+def _guess_type(vendor: str) -> str:
+    v = vendor.lower()
+    for device_type, words in _TYPE_KEYWORDS:
+        if any(w in v for w in words):
+            return device_type
+    return "unknown"
+
+
 def lookup(mac: str) -> tuple[str, str]:
     """Return (vendor, device_type) from a MAC address string."""
     key = mac.upper().replace(":", "").replace("-", "")[:6]
-    return OUI_TABLE.get(key, ("Unknown", "unknown"))
+    if len(key) < 6:
+        return "Unknown", "unknown"
+    # Locally-administered bit set → randomized "private" Wi-Fi address (modern phones/laptops).
+    if int(key[:2], 16) & 0x02:
+        return "Private address", "phone"
+    if key in OUI_TABLE:
+        return OUI_TABLE[key]
+    vendor = _load_system_oui().get(key)
+    if vendor:
+        return vendor, _guess_type(vendor)
+    return "Unknown", "unknown"

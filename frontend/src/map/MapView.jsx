@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import * as d3 from 'd3'
 import * as topojson from 'topojson-client'
 import { useT } from '../i18n'
+import { API_BASE } from '../api'
+import { FADE_AFTER_MS, HIDE_AFTER_MS } from '../hooks/useWebSocket'
 
 const STYLE = `
   @keyframes arcFlow {
@@ -78,7 +80,7 @@ function applyLabelCollision(g, k) {
   }
 }
 
-export default function MapView({ nodes, onNodeClick }) {
+export default function MapView({ nodes, lastSeen, tick, onNodeClick }) {
   const { t, lang } = useT()
   const svgRef    = useRef(null)
   const gRef      = useRef(null)
@@ -95,11 +97,17 @@ export default function MapView({ nodes, onNodeClick }) {
       ? new URL('countries-110m.json', window.location.href).href
       : '/countries-110m.json'
     fetch(worldUrl).then(r => r.json()).then(setWorldTopo)
-    navigator.geolocation?.getCurrentPosition(
-      p => setUserPos([p.coords.longitude, p.coords.latitude]),
-      () => setUserPos([2.35, 48.85])
-    )
-    if (!navigator.geolocation) setUserPos([2.35, 48.85])
+    // Electron has no browser geolocation, so fall back to the location of our public IP, then Paris.
+    const fallback = () =>
+      fetch(`${API_BASE}/me`).then(r => r.json())
+        .then(g => setUserPos(g.lat != null ? [g.lon, g.lat] : [2.35, 48.85]))
+        .catch(() => setUserPos([2.35, 48.85]))
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        p => setUserPos([p.coords.longitude, p.coords.latitude]),
+        fallback
+      )
+    } else fallback()
   }, [])
 
   useEffect(() => {
@@ -111,7 +119,7 @@ export default function MapView({ nodes, onNodeClick }) {
   useEffect(() => {
     if (!gRef.current || !projRef.current) return
     drawConnections(projRef.current)
-  }, [nodes])
+  }, [nodes, tick])
 
   function rescaleAll(k) {
     const g = gRef.current
@@ -246,12 +254,24 @@ export default function MapView({ nodes, onNodeClick }) {
     const pos     = userPosRef.current || [2.35, 48.85]
     const k       = kRef.current
 
+    // Fade hosts that have gone quiet (full opacity until FADE_AFTER_MS, down to 0.2 by HIDE_AFTER_MS).
+    const fade = d => {
+      const idle = Date.now() - (lastSeen?.current?.[d.id] ?? Date.now())
+      if (idle <= FADE_AFTER_MS) return 1
+      return Math.max(0.2, 1 - 0.8 * (idle - FADE_AFTER_MS) / (HIDE_AFTER_MS - FADE_AFTER_MS))
+    }
+
     const geoNodes = Object.values(nodes)
-      .filter(n => n.id !== 'local' && n.lat != null && n.lon != null)
+      .filter(n => n.id !== 'local' && (n.anycast || (n.lat != null && n.lon != null)))
+    // Anycast hosts have no real location: pin them around "You" instead of drawing an arc.
+    const at = d => {
+      const [jx, jy] = jitter(d.id)
+      return d.anycast ? [pos[0] + jx, pos[1] + jy] : [d.lon + jx, d.lat + jy]
+    }
 
     // ── Arcs ──────────────────────────────────────────────────────────────────
     const arcs = g.select('.arcs').selectAll('path.arc-flow')
-      .data(geoNodes, d => d.id)
+      .data(geoNodes.filter(d => !d.anycast), d => d.id)
 
     const arcsEnter = arcs.enter().append('path')
       .attr('class', 'arc-flow')
@@ -264,6 +284,7 @@ export default function MapView({ nodes, onNodeClick }) {
         const [jx, jy] = jitter(d.id)
         return geoPath({ type: 'LineString', coordinates: [pos, [d.lon + jx, d.lat + jy]] })
       })
+      .attr('opacity', fade)
       .attr('stroke', d => d.color || '#94a3b8')
       .attr('stroke-opacity', 0.4)
       .attr('stroke-width', d => Math.min(0.8 + Math.log1p((d.bytes || 0) / 512), 3.5) / k)
@@ -288,14 +309,13 @@ export default function MapView({ nodes, onNodeClick }) {
     const all = enter.merge(dotGroups)
 
     all.each(function (d) {
-      const [jx, jy] = jitter(d.id)
-      const pt = projection([d.lon + jx, d.lat + jy])
+      const pt = projection(at(d))
       if (!pt) return
       const [x, y] = pt
       const r  = Math.min(3 + Math.log1p(d.packets || 0) * 0.4, 9)
       const vr = r / k
 
-      d3.select(this).attr('transform', `translate(${x},${y})`)
+      d3.select(this).attr('transform', `translate(${x},${y})`).attr('opacity', fade(d))
 
       const pulse = d3.select(this).select('.pulse')
       pulse.attr('r', (r + 3) / k).attr('stroke', d.color || '#94a3b8')
@@ -330,8 +350,8 @@ export default function MapView({ nodes, onNodeClick }) {
     applyLabelCollision(g, k)
   }
 
-  const geoCount   = Object.values(nodes).filter(n => n.id !== 'local' && n.lat).length
-  const noGeoCount = Object.values(nodes).filter(n => n.id !== 'local' && !n.lat).length
+  const geoCount   = Object.values(nodes).filter(n => n.id !== 'local' && (n.lat || n.anycast)).length
+  const noGeoCount = Object.values(nodes).filter(n => n.id !== 'local' && !n.lat && !n.anycast).length
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
