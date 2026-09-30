@@ -11,6 +11,8 @@ See every connection your Mac makes: who it talks to, where they are, and which 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 [![Platform: macOS](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue.svg)]()
 
+**[Download for macOS (Apple Silicon)](https://github.com/gchek/capture/releases/latest)** · [Install notes](MAC-INSTALL.md)
+
 <img src="docs/demo.gif" alt="Orbis demo" width="100%"/>
 
 </div>
@@ -20,6 +22,10 @@ See every connection your Mac makes: who it talks to, where they are, and which 
 ## Fork notice
 
 This is a fork of **[PCYBOX Orbis](https://github.com/Mister-iks/pcybox-orbis)** by [Mister-iks](https://github.com/Mister-iks), a Windows-only tool. All credit for the original design, UI and capture engine goes to them. The original git history is preserved in this repository, and the project stays under the same **AGPL v3** license.
+
+## Download
+
+Get the latest `.dmg` from the **[Releases page](https://github.com/gchek/capture/releases/latest)** (Assets section at the bottom). Open it, drag the app to Applications, and follow [MAC-INSTALL.md](MAC-INSTALL.md) for the first launch.
 
 ## What this fork changes
 
