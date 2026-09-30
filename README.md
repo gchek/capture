@@ -11,7 +11,7 @@ See every connection your Mac makes: who it talks to, where they are, and which 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 [![Platform: macOS](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue.svg)]()
 
-**[Download for macOS (Apple Silicon)](https://github.com/gchek/capture/releases/latest)** · [Install notes](MAC-INSTALL.md)
+**[Download for macOS (Apple Silicon)](https://github.com/gchek/capture/releases/download/v1.1.0-mac/PCYBOX.Orbis-1.1.0-arm64.dmg)** · [Install notes](MAC-INSTALL.md)
 
 <img src="docs/demo.gif" alt="Orbis demo" width="100%"/>
 
@@ -25,7 +25,7 @@ This is a fork of **[PCYBOX Orbis](https://github.com/Mister-iks/pcybox-orbis)**
 
 ## Download
 
-Get the latest `.dmg` from the **[Releases page](https://github.com/gchek/capture/releases/latest)** (Assets section at the bottom). Open it, drag the app to Applications, and follow [MAC-INSTALL.md](MAC-INSTALL.md) for the first launch.
+**[PCYBOX.Orbis-1.1.0-arm64.dmg](https://github.com/gchek/capture/releases/download/v1.1.0-mac/PCYBOX.Orbis-1.1.0-arm64.dmg)** (113 MB, direct download), or browse the **[Releases page](https://github.com/gchek/capture/releases/latest)**. Open the DMG, drag the app to Applications, and follow [MAC-INSTALL.md](MAC-INSTALL.md) for the first launch.
 
 ## What this fork changes
 
