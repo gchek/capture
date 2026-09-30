@@ -45,9 +45,16 @@ class Device:
         }
 
 
-def _get_local_subnets() -> list[str]:
+# Tunnels and virtual interfaces have no Ethernet layer, so ARP can't work on them (e.g. when a VPN is up).
+_NO_ARP_IFACES = ("lo", "utun", "awdl", "llw", "gif", "stf", "ipsec", "ppp", "anpi", "ap")
+
+
+def _get_local_subnets() -> list[tuple[str, str]]:
+    """(interface, subnet) pairs worth ARP-scanning."""
     subnets = []
     for iface, addrs in psutil.net_if_addrs().items():
+        if iface.startswith(_NO_ARP_IFACES):
+            continue
         for addr in addrs:
             if addr.family != socket.AF_INET:
                 continue
@@ -59,7 +66,7 @@ def _get_local_subnets() -> list[str]:
                 network = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
                 if network.num_addresses <= 2 or network.num_addresses > 65536:
                     continue
-                subnets.append(str(network))
+                subnets.append((iface, str(network)))
             except ValueError:
                 continue
     return subnets
@@ -72,17 +79,19 @@ def _resolve_hostname(ip: str) -> Optional[str]:
         return None
 
 
-def _scan_subnet(subnet: str, timeout: int = 2) -> list[Device]:
+def _scan_subnet(subnet: str, iface: str, timeout: int = 2) -> list[Device]:
     if not SCAPY_AVAILABLE:
         return []
     try:
         ans, _ = srp(
             Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=subnet),
+            iface=iface,
             timeout=timeout,
             verbose=False,
             retry=1,
         )
-    except Exception:
+    except Exception as exc:
+        print(f"[arp] scan of {subnet} on {iface} failed: {exc}", flush=True)
         return []
 
     devices = []
@@ -129,8 +138,8 @@ class ARPScanner:
             subnets = _get_local_subnets()
             seen_ips: set[str] = set()
 
-            for subnet in subnets:
-                for device in _scan_subnet(subnet):
+            for iface, subnet in subnets:
+                for device in _scan_subnet(subnet, iface):
                     seen_ips.add(device.ip)
                     is_new = device.ip not in self._known
                     self._known[device.ip] = device

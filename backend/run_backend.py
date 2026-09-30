@@ -29,6 +29,10 @@ def _exit_with_parent(pid: int) -> None:
 
 
 if __name__ == '__main__':
+    # The packaged backend is launched detached, so keep its output where the user can find it.
+    if os.environ.get('ORBIS_DATA_DIR'):
+        os.makedirs(os.environ['ORBIS_DATA_DIR'], exist_ok=True)
+        sys.stdout = sys.stderr = open(os.path.join(os.environ['ORBIS_DATA_DIR'], 'backend.log'), 'a', buffering=1)
     if os.environ.get('ORBIS_PARENT_PID'):
         threading.Thread(target=_exit_with_parent, args=(int(os.environ['ORBIS_PARENT_PID']),), daemon=True).start()
     # Electron bundles freeze the app; bind locally. Docker/dev default to all interfaces.

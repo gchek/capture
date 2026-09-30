@@ -1,12 +1,14 @@
 import asyncio
+import ipaddress
 import socket
+import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable, Optional
 
 try:
-    from scapy.all import sniff, IP, TCP, UDP, DNS, DNSQR, AsyncSniffer
+    from scapy.all import sniff, IP, TCP, UDP, DNS, DNSQR, AsyncSniffer, conf
     SCAPY_AVAILABLE = True
 except ImportError:
     SCAPY_AVAILABLE = False
@@ -58,6 +60,40 @@ def _refresh_port_cache(kind: str) -> None:
     _port_cache_at[kind] = time.monotonic()
 
 
+def get_capture_ifaces() -> list[str]:
+    """Active Ethernet/Wi-Fi interfaces plus VPN tunnels (utun*) that carry an IPv4 address.
+    Scapy's default is the default-route interface, which is the tunnel when a VPN is up."""
+    stats = psutil.net_if_stats()
+    ifaces = []
+    for name, addrs in psutil.net_if_addrs().items():
+        if not name.startswith(("en", "utun")) or name not in stats or not stats[name].isup:
+            continue
+        if any(a.family == socket.AF_INET and not a.address.startswith("169.254.") for a in addrs):
+            ifaces.append(name)
+    return ifaces
+
+
+def get_vpn_endpoints() -> set[str]:
+    """Public hosts reached through a host route on a physical interface: the VPN servers.
+    With a tunnel up, packets to them are the encrypted copy of traffic we already see decrypted on utun*."""
+    try:
+        out = subprocess.run(["netstat", "-rn", "-f", "inet"], capture_output=True, text=True, timeout=5).stdout
+    except Exception:
+        return set()
+    endpoints = set()
+    for line in out.splitlines():
+        cols = line.split()
+        if len(cols) < 4 or not cols[3].startswith("en") or not ("G" in cols[2] and "H" in cols[2]):
+            continue
+        try:
+            ip = ipaddress.ip_address(cols[0])
+        except ValueError:
+            continue
+        if ip.is_global:
+            endpoints.add(cols[0])
+    return endpoints
+
+
 def get_process_for_port(port: int, proto: str) -> tuple[Optional[int], Optional[str]]:
     # Scanning the socket table per packet pegs a CPU core; refresh it at most once per TTL.
     kind = "tcp" if proto == "TCP" else "udp"
@@ -73,13 +109,7 @@ class PacketSniffer:
         self.local_ips = get_local_ips()
         self._sniffer: Optional[AsyncSniffer] = None
         self._running = False
-
-    @property
-    def _bpf_filter(self) -> str:
-        if not self.ports:
-            return "ip"
-        port_expr = " or ".join(f"port {p}" for p in self.ports)
-        return f"ip and ({port_expr})"
+        self._vpn_endpoints: set[str] = set()
 
     def _process_packet(self, pkt) -> None:
         if not pkt.haslayer(IP):
@@ -89,6 +119,8 @@ class PacketSniffer:
         src, dst = ip.src, ip.dst
 
         if src not in self.local_ips and dst not in self.local_ips:
+            return
+        if src in self._vpn_endpoints or dst in self._vpn_endpoints:
             return
 
         proto = "OTHER"
@@ -102,6 +134,10 @@ class PacketSniffer:
             proto = "UDP"
             src_port = pkt[UDP].sport
             dst_port = pkt[UDP].dport
+
+        # Filter here, not with a BPF filter: those are compiled for Ethernet and match nothing on utun*.
+        if self.ports and src_port not in self.ports and dst_port not in self.ports:
+            return
 
         direction = "out" if src in self.local_ips else "in"
         local_port = src_port if direction == "out" else dst_port
@@ -130,15 +166,29 @@ class PacketSniffer:
             return
         self._running = True
         try:
+            ifaces = get_capture_ifaces()
+            if any(i.startswith("utun") for i in ifaces):
+                self._vpn_endpoints = get_vpn_endpoints()
             self._sniffer = AsyncSniffer(
-                filter=self._bpf_filter,
+                iface=ifaces or None,
                 prn=self._process_packet,
                 store=False,
             )
             self._sniffer.start()
-            # Keep thread alive so the daemon thread doesn't exit prematurely
+            print(f"[sniffer] capturing on {ifaces or conf.iface}, ignoring VPN endpoints {sorted(self._vpn_endpoints)}", flush=True)
+            # Keep thread alive so the daemon thread doesn't exit prematurely.
+            # AsyncSniffer swallows capture errors (e.g. no BPF access), so surface them here.
+            reported = False
+            ticks = 0
             while self._running:
                 time.sleep(1)
+                ticks += 1
+                if ticks % 30 == 0 and any(i.startswith("utun") for i in ifaces):
+                    self._vpn_endpoints = get_vpn_endpoints()
+                exc = getattr(self._sniffer, "exception", None)
+                if exc and not reported:
+                    reported = True
+                    print(f"[sniffer] capture failed on {ifaces or conf.iface}: {exc}", flush=True)
         except Exception as exc:
             print(f"[sniffer] failed to start: {exc}", flush=True)
 

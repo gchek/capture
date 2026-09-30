@@ -26,6 +26,7 @@ This is a fork of **[PCYBOX Orbis](https://github.com/Mister-iks/pcybox-orbis)**
 **macOS support**
 - Runs on macOS with Scapy over BPF instead of Npcap.
 - Packaged as a `.dmg` for Apple Silicon (`build-mac.sh`). Capture needs root, so the app asks for the Mac password on each launch, and the capture engine exits when the app quits. See [MAC-INSTALL.md](MAC-INSTALL.md).
+- Works with a VPN: it captures on the tunnel interface (`utun*`) as well as Ethernet/Wi-Fi, and ignores the encrypted copy of the traffic to the VPN server, so you see real destinations and apps instead of one encrypted connection.
 - Process attribution uses a socket table cached once per second, instead of scanning it for every packet, which cut CPU use from about 40% to 10–15% of a core in a quick test.
 - The map falls back to your public IP's location when the browser can't provide one (Electron can't), instead of a hard-coded Paris.
 
