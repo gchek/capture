@@ -2,160 +2,89 @@
 
 <img src="docs/pcybox-orbis-white.svg" width="180" alt="PCYBOX Orbis logo"/>
 
-# PCYBOX Orbis
+# Capture
 
-**Map the invisible.**
+**A macOS port of PCYBOX Orbis — real-time network traffic visualizer.**
 
-Real-time network traffic visualizer for Windows.
-See every connection your computer makes - who it talks to, where they are, and which app is responsible.
+See every connection your Mac makes: who it talks to, where they are, and which app is responsible.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
-[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-blue.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)]()
+[![Platform: macOS](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue.svg)]()
 
-[Website](https://orbis.pcybox.com) - [Download](https://github.com/Mister-iks/pcybox-orbis/releases/latest) - [Report a bug](https://github.com/Mister-iks/pcybox-orbis/issues)
-
-<br/>
-
-<img src="docs/demo.gif" alt="PCYBOX Orbis demo" width="100%"/>
+<img src="docs/demo.gif" alt="Orbis demo" width="100%"/>
 
 </div>
 
 ---
 
-## Features
+## Fork notice
+
+This is a fork of **[PCYBOX Orbis](https://github.com/Mister-iks/pcybox-orbis)** by [Mister-iks](https://github.com/Mister-iks), a Windows-only tool. All credit for the original design, UI and capture engine goes to them. The original git history is preserved in this repository, and the project stays under the same **AGPL v3** license.
+
+## What this fork changes
+
+**macOS support**
+- Runs on macOS with Scapy over BPF instead of Npcap.
+- Packaged as a `.dmg` for Apple Silicon (`build-mac.sh`). Capture needs root, so the app asks for the Mac password on each launch, and the capture engine exits when the app quits. See [MAC-INSTALL.md](MAC-INSTALL.md).
+- Process attribution uses a socket table cached once per second, instead of scanning it for every packet, which cut CPU use from about 40% to 10–15% of a core in a quick test.
+- The map falls back to your public IP's location when the browser can't provide one (Electron can't), instead of a hard-coded Paris.
+
+**Detection and display**
+- **Beacon detector** rewritten: it now looks for outbound bursts at near-constant intervals, instead of flagging any host that receives 30 packets per minute. Steady HTTPS streams no longer trigger it. Periodic keepalives (push notifications, chat apps) still can.
+- **MAC vendor lookup** uses the full IEEE registry that ships with macOS, and recognizes randomized "private" Wi-Fi addresses.
+- **Anycast hosts** (Cloudflare, Google Public DNS, Quad9, OpenDNS, Fastly) are drawn around "You" instead of at their registered location, which is meaningless for anycast (`1.1.1.1` is registered in Australia).
+- **Last-seen fade:** hosts with no traffic fade on the map after 1 minute and disappear after 5.
+
+## Features (from upstream)
 
 | Feature | Description |
 |---|---|
-| Force Graph | Live node graph - your machine at the center, every connection as a node |
-| World Map | Geolocated IPs with animated arcs on an interactive globe |
+| Force Graph | Live node graph — your machine at the center, every connection as a node |
+| World Map | Geolocated IPs with animated arcs |
 | 60-min Timeline | Sliding history stored locally in SQLite |
-| Anomaly Detection | Flags port scans, beaconing, potential exfiltration |
-| Process Attribution | Know which app generates which traffic (top 5 per connection) |
-| LAN Scanner | ARP discovery of all devices on your local network |
-| Privacy Score | Real-time score of your outgoing traffic exposure |
-| Bandwidth Monitor | Live MB/s sparkline |
+| Anomaly Detection | Flags suspicious ports, beaconing, volume spikes |
+| Process Attribution | Which app generates which traffic |
+| LAN Scanner | ARP discovery of devices on your network |
+| Privacy Score | Score of your outgoing traffic exposure |
+| Bandwidth Monitor | Live sparkline |
 
-## Download
+It only sees this Mac's own traffic, and never the contents of encrypted connections.
 
-**[PCYBOX Orbis Setup 1.0.0.exe](https://github.com/Mister-iks/pcybox-orbis/releases/latest)** - Windows 10/11 64-bit - ~101 MB
+## Run from source (macOS)
 
-Requires administrator rights for network capture. Npcap is installed automatically on first launch.
+Requires Python 3.10+ (3.14 works), Node.js 18+ and an administrator password.
 
-> **Windows SmartScreen warning?** Click **"More info"** → **"Run anyway"**. The app is not yet code-signed  this is expected for an indie release.
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r backend/requirements.txt
+(cd frontend && npm install)
+
+./run-mac.sh     # starts the Vite dev server and the backend as root
+```
+
+Then open http://localhost:5173.
+
+## Build the app
+
+```bash
+.venv/bin/pip install pyinstaller
+./build-mac.sh   # frontend + PyInstaller backend + Electron app + ad-hoc signed DMG in dist/installer/
+```
+
+The app is ad-hoc signed, not notarized, so macOS blocks the first launch; [MAC-INSTALL.md](MAC-INSTALL.md) explains how to open it. Notarization needs a Developer ID certificate.
+
+## Geolocation and privacy
+
+Without a MaxMind `GeoLite2-City.mmdb` in `data/`, each remote IP is sent to [ip-api.com](https://ip-api.com) (plain HTTP, 45 lookups per minute) to find its location, and one extra lookup finds where "You" are. Put a GeoLite2 database in `data/` to keep lookups offline.
+
+## Windows and Docker
+
+The upstream Windows and Docker setup is still in the repository, but this fork hasn't tested it. See the [original project](https://github.com/Mister-iks/pcybox-orbis) for those.
 
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| Packet capture | Python - Scapy - Npcap 1.79 |
-| Backend API | FastAPI - WebSockets - SQLite |
-| Frontend | React 18 - Vite - D3.js v7 - TopoJSON |
-| Desktop wrapper | Electron 28 |
-| Geolocation | MaxMind GeoLite2 |
-
-## Docker (Linux)
-
-The Docker deployment is for Linux users who want to run Orbis without installing anything beyond Docker.
-Packet capture works via `network_mode: host`  the container sees real host traffic.
-
-> **Note:** Docker Desktop on Mac/Windows runs inside a VM and cannot capture traffic from the Windows/macOS host. Use the Electron installer on those platforms.
-
-```bash
-# Clone and enter the repo
-git clone https://github.com/Mister-iks/pcybox-orbis
-cd pcybox-orbis
-
-# Optional: place your MaxMind GeoLite2-City.mmdb in data/ for offline geolocation
-# Without it, the app falls back to ip-api.com (45 req/min, no key needed)
-mkdir -p data
-
-# Build and run (requires Docker + root/sudo for raw socket capture)
-sudo docker compose up --build
-```
-
-Open **http://localhost:8000** in your browser.
-
-To run in the background: `sudo docker compose up -d --build`
-
-Limitations compared to the Electron app:
-- Process attribution is limited to container processes (host PIDs not shared by default)
-- No LAN scanner on some network configurations
-
----
-
-## Development
-
-### Requirements
-
-- Python 3.11+
-- Node.js 18+
-- [Npcap](https://npcap.com/) installed
-- Administrator terminal for backend (packet capture)
-
-### Run locally
-
-```bash
-# Backend (admin terminal)
-cd backend
-pip install -r requirements.txt
-python run_backend.py
-# API available at http://127.0.0.1:8000
-
-# Frontend (separate terminal)
-cd frontend
-npm install
-npm run dev
-# UI at http://localhost:5173
-
-# Electron (optional, admin terminal)
-cd electron
-npm install
-set VITE_DEV=1
-npx electron .
-```
-
-### Build installer
-
-```bash
-# 1 - Compile backend (PyInstaller)
-cd backend
-pip install pyinstaller
-pyinstaller backend.spec --distpath ../dist/backend
-
-# 2 - Build frontend
-cd frontend
-npm run build
-
-# 3 - Build Electron installer
-cd electron
-npm run build:dir
-# Then repack app.asar and run:
-# npx electron-builder --win nsis --prepackaged ../dist/installer/win-unpacked
-```
-
-
-## Project structure
-
-```
-pcybox-orbis/
-- backend/       Python FastAPI + Scapy capture engine
-- frontend/      React + D3.js UI
-- electron/      Electron wrapper (main.js, splash, preload)
-- website/       Official landing page (orbis.pcybox.com)
-- docs/          SVG logo variants
-- resources/     Npcap installer bundle
-- dist/          Compiled output (backend exe, installer)
-```
+Python · FastAPI · WebSockets · SQLite · Scapy — React 18 · Vite · D3.js · TopoJSON — Electron 28 · PyInstaller.
 
 ## License
 
-AGPL v3 - see [LICENSE](LICENSE)
-
-Free to use, study, and modify. Any derivative work must also be open source under AGPL v3. Commercial use requires a separate license - contact ibrahimapro289@gmail.com
-
----
-
-<div align="center">
-Built by <a href="https://github.com/Mister-iks">Mister-iks</a> - PCYBOX 2026
-</div>
+AGPL v3 — see [LICENSE](LICENSE). Any derivative work must also be open source under AGPL v3.
