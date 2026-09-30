@@ -45,7 +45,8 @@ def classify(
 
     if hostname:
         h = hostname.lower()
-        for tracker in KNOWN_TRACKERS:
+        # WhatsApp servers live under facebook.com / fbcdn.net but are a messaging app, not a tracker.
+        for tracker in () if "whatsapp" in h else KNOWN_TRACKERS:
             if tracker in h:
                 return TrafficCategory(label, "tracking", "medium", "#f59e0b")
         for cdn in KNOWN_CDN:

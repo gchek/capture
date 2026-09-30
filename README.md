@@ -34,6 +34,7 @@ This is a fork of **[PCYBOX Orbis](https://github.com/Mister-iks/pcybox-orbis)**
 - **Beacon detector** rewritten: it now looks for outbound bursts at near-constant intervals, instead of flagging any host that receives 30 packets per minute. Steady HTTPS streams no longer trigger it. Periodic keepalives (push notifications, chat apps) still can.
 - **MAC vendor lookup** uses the full IEEE registry that ships with macOS, and recognizes randomized "private" Wi-Fi addresses.
 - **Anycast hosts** (Cloudflare, Google Public DNS, Quad9, OpenDNS, Fastly) are drawn around "You" instead of at their registered location, which is meaningless for anycast (`1.1.1.1` is registered in Australia).
+- **Privacy score** no longer counts ordinary servers as ad networks or trackers (Google, Google Cloud, WhatsApp), and counts recurring beacon and warning alerts once per host instead of once per alert. It measures which servers your apps contact, not whether you use a VPN.
 - **Last-seen fade:** hosts with no traffic fade on the map after 1 minute and disappear after 5.
 
 ## Features (from upstream)

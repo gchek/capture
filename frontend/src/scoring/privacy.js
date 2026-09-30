@@ -1,6 +1,7 @@
+// Organisations that are ad networks. Not "google"/"facebook"/"meta"/"snap": those match ordinary
+// servers (Gmail, Google Cloud, WhatsApp, ...). Google and Facebook trackers are caught by hostname instead.
 const AD_ORGS = [
-  'google', 'doubleclick', 'facebook', 'meta', 'amazon ads',
-  'amazon advertising', 'twitter', 'tiktok', 'snap', 'pinterest',
+  'doubleclick', 'amazon ads', 'amazon advertising', 'twitter', 'tiktok', 'pinterest',
   'taboola', 'outbrain', 'criteo', 'appnexus', 'pubmatic',
   'openx', 'rubicon', 'sharethrough', 'index exchange',
 ]
@@ -23,11 +24,13 @@ export function computePrivacyScore(nodes, alerts) {
   const byType = type => alerts.filter(a => a.type === type).length
   const bySev  = sev  => alerts.filter(a => a.severity === sev).length
 
-  const beaconCount   = byType('BEACON')
+  // Count hosts, not alerts: one periodic connection re-alerts every few minutes.
+  const beaconCount   = new Set(alerts.filter(a => a.type === 'BEACON').map(a => a.node_id)).size
   const suspProcCount = byType('SUSPICIOUS_PROCESS')
   const suspPortCount = byType('SUSPICIOUS_PORT')
   const criticalCount = bySev('critical')
-  const warningCount  = bySev('warning')
+  // Distinct (type, host) pairs: the same recurring warning shouldn't be counted again each time it re-alerts.
+  const warningCount  = new Set(alerts.filter(a => a.severity === 'warning').map(a => `${a.type}:${a.node_id}`)).size
 
   let score = 100
   const factors = []
@@ -55,7 +58,7 @@ export function computePrivacyScore(nodes, alerts) {
   }
 
   if (beaconCount > 0) {
-    const p = Math.min(beaconCount * 12, 24)
+    const p = Math.min(beaconCount * 4, 12)
     score -= p
     factors.push({ icon: 'activity', key: 'score_beacons', args: [beaconCount], penalty: p, bad: true })
   }
