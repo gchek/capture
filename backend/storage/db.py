@@ -8,7 +8,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 def _get_db_path() -> Path:
-    if getattr(sys, 'frozen', False):
+    if os.environ.get('ORBIS_DATA_DIR'):
+        db_dir = Path(os.environ['ORBIS_DATA_DIR'])
+    elif getattr(sys, 'frozen', False):
         appdata = Path(os.environ.get('LOCALAPPDATA', Path.home()))
         db_dir = appdata / 'PCYBOXOrbis'
     else:

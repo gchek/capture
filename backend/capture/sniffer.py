@@ -37,18 +37,33 @@ def get_local_ips() -> set[str]:
     return ips
 
 
-def get_process_for_port(port: int, proto: str) -> tuple[Optional[int], Optional[str]]:
-    kind = "tcp" if proto == "TCP" else "udp"
+_PORT_CACHE_TTL = 1.0
+_port_cache: dict[str, dict[int, tuple[int, Optional[str]]]] = {"tcp": {}, "udp": {}}
+_port_cache_at: dict[str, float] = {"tcp": 0.0, "udp": 0.0}
+
+
+def _refresh_port_cache(kind: str) -> None:
+    table: dict[int, tuple[int, Optional[str]]] = {}
     try:
         for conn in psutil.net_connections(kind=kind):
-            if conn.laddr and conn.laddr.port == port and conn.pid:
+            if conn.laddr and conn.pid and conn.laddr.port not in table:
                 try:
-                    return conn.pid, psutil.Process(conn.pid).name()
+                    name = psutil.Process(conn.pid).name()
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    return conn.pid, None
+                    name = None
+                table[conn.laddr.port] = (conn.pid, name)
     except Exception:
         pass
-    return None, None
+    _port_cache[kind] = table
+    _port_cache_at[kind] = time.monotonic()
+
+
+def get_process_for_port(port: int, proto: str) -> tuple[Optional[int], Optional[str]]:
+    # Scanning the socket table per packet pegs a CPU core; refresh it at most once per TTL.
+    kind = "tcp" if proto == "TCP" else "udp"
+    if time.monotonic() - _port_cache_at[kind] > _PORT_CACHE_TTL:
+        _refresh_port_cache(kind)
+    return _port_cache[kind].get(port, (None, None))
 
 
 class PacketSniffer:

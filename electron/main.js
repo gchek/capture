@@ -7,13 +7,18 @@ const fs   = require('fs')
 
 // ── Paths ──────────────────────────────────────────────────────────────────────
 const isDev        = !app.isPackaged
+const isMac        = process.platform === 'darwin'
 const resourcesDir = isDev
   ? path.join(__dirname, '..')          // trafic_graph/
   : process.resourcesPath
 
-const backendExe = isDev
-  ? path.join(resourcesDir, 'dist', 'backend', 'pcybox-orbis-backend.exe')
-  : path.join(resourcesDir, 'pcybox-orbis-backend.exe')
+const backendExe = isMac
+  ? (isDev
+      ? path.join(resourcesDir, 'dist', 'backend-mac', 'pcybox-orbis-backend', 'pcybox-orbis-backend')
+      : path.join(resourcesDir, 'backend', 'pcybox-orbis-backend'))
+  : isDev
+    ? path.join(resourcesDir, 'dist', 'backend', 'pcybox-orbis-backend.exe')
+    : path.join(resourcesDir, 'pcybox-orbis-backend.exe')
 
 const npcapInstaller = isDev
   ? path.join(resourcesDir, 'resources', 'npcap-installer.exe')
@@ -136,6 +141,8 @@ function waitForBackend(maxAttempts = 40) {
 }
 
 function killBackend() {
+  // macOS: the backend runs as root, so we can't kill it; it exits by itself when this process dies.
+  if (isMac) return
   if (backendProc) {
     try {
       // taskkill /F is more reliable than .kill() on Windows
@@ -147,11 +154,32 @@ function killBackend() {
   killPort(BACKEND_PORT)
 }
 
+// Packet capture needs root on macOS (BPF), so ask for the admin password once per launch.
+function launchBackendMac() {
+  const dataDir = path.join(app.getPath('userData'), 'data')
+  fs.mkdirSync(dataDir, { recursive: true })
+  const sh = v => `'${v.replace(/'/g, "'\\''")}'`
+  const asString = v => v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  const cmd = `ORBIS_PARENT_PID=${process.pid} ORBIS_DATA_DIR=${sh(dataDir)} ${sh(backendExe)} >/dev/null 2>&1 &`
+  const script = `do shell script "${asString(cmd)}" with administrator privileges with prompt "PCYBOX Orbis needs administrator access to capture network traffic."`
+  const proc = spawn('osascript', ['-e', script], { stdio: ['ignore', 'ignore', 'pipe'] })
+  let err = ''
+  proc.stderr.on('data', d => { err += d })
+  proc.on('exit', code => {
+    if (code === 0 || isQuitting) return
+    dialog.showErrorBox('PCYBOX Orbis', err.includes('-128')
+      ? 'Administrator access is required to capture network traffic.'
+      : `Could not start the capture engine:\n${err}`)
+    app.quit()
+  })
+}
+
 function launchBackend() {
   if (!fs.existsSync(backendExe)) {
     dialog.showErrorBox('PCYBOX Orbis', `Backend introuvable :\n${backendExe}`)
     app.quit(); return
   }
+  if (isMac) return launchBackendMac()
 
   // Free port before launching  handles zombies from crashed sessions
   killPort(BACKEND_PORT)
@@ -176,7 +204,7 @@ function launchBackend() {
 
 // ── App lifecycle ──────────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
-  if (!isNpcapInstalled()) {
+  if (!isMac && !isNpcapInstalled()) {
     if (fs.existsSync(npcapInstaller)) {
       const choice = dialog.showMessageBoxSync({
         type: 'question', title: 'PCYBOX Orbis - Npcap requis',
@@ -205,10 +233,9 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    isQuitting = true  // block spurious exit-event dialogs before before-quit fires
-    app.quit()
-  }
+  // Single-window monitor: quit everywhere so the root backend never lingers.
+  isQuitting = true  // block spurious exit-event dialogs before before-quit fires
+  app.quit()
 })
 
 app.on('before-quit', () => {
