@@ -141,7 +141,7 @@ export default function PrivacyScore({ score, grade, color, labelKey, factors })
         {ai?.loading ? t('ai_explaining') : t('ai_explain_btn')}
       </button>
       {ai?.text && (
-        <div style={{ marginTop: 10, fontSize: 11, lineHeight: 1.5, color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
+        <div style={{ marginTop: 10, maxHeight: 220, overflowY: 'auto', paddingRight: 6, fontSize: 11, lineHeight: 1.5, color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
           {ai.text}
         </div>
       )}
