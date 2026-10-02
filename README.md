@@ -42,6 +42,9 @@ This is a fork of **[PCYBOX Orbis](https://github.com/Mister-iks/pcybox-orbis)**
 - **Anycast hosts** (Cloudflare, Google Public DNS, Quad9, OpenDNS, Fastly) are drawn around "You" instead of at their registered location, which is meaningless for anycast (`1.1.1.1` is registered in Australia).
 - **Privacy score** no longer counts ordinary servers as ad networks or trackers (Google, Google Cloud, WhatsApp), and counts recurring beacon and warning alerts once per host instead of once per alert. It measures which servers your apps contact, not whether you use a VPN.
 - **Last-seen fade:** hosts with no traffic fade on the map after 1 minute and disappear after 5.
+- **Clickable host list:** clicking a host in the sidebar selects it, like clicking it on the graph or map.
+- **Alerts follow the language toggle:** alert messages used to be hard-coded in French and are now shown in English or French.
+- **Optional AI explanations** of the privacy score and of a single connection (see below).
 
 ## Features (from upstream)
 
@@ -81,9 +84,14 @@ Then open http://localhost:5173.
 
 The app is ad-hoc signed, not notarized, so macOS blocks the first launch; [MAC-INSTALL.md](MAC-INSTALL.md) explains how to open it. Notarization needs a Developer ID certificate.
 
-## AI explanation of the privacy score (optional)
+## AI explanations (optional)
 
-The privacy score panel has an **Explain with AI** button. It asks Claude to say, in plain language, why your score is what it is, which apps are responsible and what to do about it. It is off until you provide a Claude credential: either a Claude subscription token (`CLAUDE_CODE_OAUTH_TOKEN`, from `claude setup-token`) or an [Anthropic API key](https://console.anthropic.com/) (`ANTHROPIC_API_KEY`):
+Two buttons ask Claude to explain what you are seeing, in plain language and in the language selected in the app:
+
+- **Explain with AI** in the privacy score panel: why your score is what it is, which apps generate the traffic, which findings are harmless and what to do about the rest.
+- **Ask AI about this host** in a host's detail panel (click a host in the graph, the map or the sidebar list): what that connection most likely is, whether it looks normal and what to check if not.
+
+Answers appear in a scrollable box with a close button. Both are off until you provide a Claude credential: either a Claude subscription token (`CLAUDE_CODE_OAUTH_TOKEN`, from `claude setup-token`) or an [Anthropic API key](https://console.anthropic.com/) (`ANTHROPIC_API_KEY`):
 
 1. Create a `.env` file:
    - From source: in the repo root (next to `run-mac.sh`)
@@ -95,7 +103,7 @@ The privacy score panel has an **Explain with AI** button. It asks Claude to say
    ```
    One is enough. If both are set, the subscription token is used. (You can also export either variable in the shell before `./run-mac.sh`.)
 
-`.env` is git-ignored, so the key is never committed. The file is read on each click, so no restart is needed. Only metadata is sent: hostnames (or the remote server's IP when it has no name), process names and counts. Never packet contents or your own IP, and only when you click the button.
+`.env` is git-ignored, so the key is never committed. The file is read on each click, so no restart is needed. Only metadata is sent: hostnames (or the remote server's IP when it has no name), organisation and country, process names, traffic volumes and alert types. Never packet contents, MAC addresses or your own IP, and only when you click a button.
 
 ## Geolocation and privacy
 
