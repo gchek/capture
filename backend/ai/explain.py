@@ -76,10 +76,17 @@ def build_summary(nodes: dict, alerts: list, score: int, grade: str) -> dict:
     by_id = {n["id"]: n for n in ext}
     beacon_ids = {a.get("node_id") for a in alerts if a.get("type") == "BEACON"}
     other = {(a.get("type"), a.get("node_id")) for a in alerts if a.get("type") != "BEACON"}
+    by_process: dict[str, int] = {}
+    for n in ext:
+        for name, st in (n.get("processes") or {}).items():
+            by_process[name] = by_process.get(name, 0) + st.get("bytes", 0)
+    top_processes = sorted(by_process.items(), key=lambda kv: -kv[1])[:8]
     return {
         "score": score,
         "grade": grade,
         "external_hosts": len(ext),
+        "traffic_by_process_kb": {name: round(b / 1024) for name, b in top_processes},
+        "busiest_hosts": [entry(n) for n in sorted(ext, key=lambda n: -n.get("bytes", 0))[:8]],
         "tracker_hosts": [entry(n) for n in trackers[:15]],
         "tracker_traffic_pct": round(100 * sum(n.get("bytes", 0) for n in trackers) / total, 1),
         "beacon_hosts": [entry(by_id[i]) for i in beacon_ids if i in by_id][:10],

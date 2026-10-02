@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, X } from 'lucide-react'
 import { useT } from '../i18n'
 import { API_BASE } from '../api'
 
@@ -39,8 +39,18 @@ export default function AskAI({ endpoint, body, label }) {
         <Sparkles size={12} />
         {ai?.loading ? t('ai_explaining') : label}
       </button>
+      {(ai?.text || ai?.error) && (
+        <button
+          onClick={() => setAi(null)}
+          aria-label={t('ai_close')}
+          title={t('ai_close')}
+          style={{ display: 'block', marginLeft: 'auto', marginTop: 8, background: 'none', border: 'none', padding: 2, color: '#64748b', cursor: 'pointer' }}
+        >
+          <X size={14} />
+        </button>
+      )}
       {ai?.text && (
-        <div className="scroll-visible" style={{ marginTop: 10, maxHeight: 220, overflowY: 'auto', paddingRight: 6, fontSize: 11, lineHeight: 1.5, color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
+        <div className="scroll-visible" style={{ marginTop: 2, maxHeight: 220, overflowY: 'auto', paddingRight: 6, fontSize: 11, lineHeight: 1.5, color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
           {ai.text}
         </div>
       )}
