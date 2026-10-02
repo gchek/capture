@@ -89,6 +89,7 @@ export default function App() {
         lanDevices={lanDevices}
         packets={filteredPackets}
         selected={selected}
+        onSelect={setSelected}
         onClose={() => setSelected(null)}
         privacyScore={privacyScore}
         bandwidth={bandwidth}

@@ -39,7 +39,7 @@ function matchesFilter(node, filter) {
   return true
 }
 
-export default function Sidebar({ nodes, lanDevices, packets, selected, onClose, privacyScore, bandwidth, filter, onFilterChange, onWhitelist }) {
+export default function Sidebar({ nodes, lanDevices, packets, selected, onSelect, onClose, privacyScore, bandwidth, filter, onFilterChange, onWhitelist }) {
   const { t } = useT()
   const extNodes = Object.values(nodes).filter(n => n.id !== 'local')
   const devList  = Object.values(lanDevices)
@@ -108,7 +108,7 @@ export default function Sidebar({ nodes, lanDevices, packets, selected, onClose,
         <SectionTitle label={t('section_ext', filteredNodes.length, hiddenCount)} />
         {filteredNodes
           .sort((a, b) => (b.bytes || 0) - (a.bytes || 0))
-          .map(n => <NodeRow key={n.id} node={n} />)}
+          .map(n => <NodeRow key={n.id} node={n} active={selected?.id === n.id} onSelect={onSelect} />)}
       </div>
 
       <div style={{ borderTop: '1px solid #334155', maxHeight: 160, overflowY: 'auto' }}>
@@ -161,9 +161,15 @@ function DeviceRow({ device }) {
   )
 }
 
-function NodeRow({ node }) {
+function NodeRow({ node, active, onSelect }) {
   return (
-    <div style={{ padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #1e293b' }}>
+    <div
+      onClick={() => onSelect?.(node)}
+      style={{
+        padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #1e293b',
+        cursor: 'pointer', background: active ? '#0f172a' : 'transparent',
+      }}
+    >
       <div style={{ width: 7, height: 7, borderRadius: '50%', background: CATEGORY_COLORS[node.category] || '#94a3b8', flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 11, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
