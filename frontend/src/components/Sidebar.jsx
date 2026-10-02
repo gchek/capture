@@ -101,7 +101,7 @@ export default function Sidebar({ nodes, lanDevices, packets, selected, onSelect
         {devList.length > 0 && (
           <>
             <SectionTitle label={t('section_lan', devList.length)} />
-            {devList.map(d => <DeviceRow key={d.id} device={d} />)}
+            {devList.map(d => <DeviceRow key={d.id} device={d} active={selected?.id === d.id} onSelect={onSelect} />)}
           </>
         )}
 
@@ -136,15 +136,19 @@ function Stat({ label, value, color }) {
   )
 }
 
-function DeviceRow({ device }) {
+function DeviceRow({ device, active, onSelect }) {
   const { t } = useT()
   const Icon = DEVICE_ICONS[device.device_type] || HelpCircle
   return (
-    <div style={{
-      padding: '7px 20px', display: 'flex', alignItems: 'center', gap: 8,
-      borderBottom: '1px solid #1e293b',
-      opacity: device.online === false ? 0.45 : 1,
-    }}>
+    <div
+      onClick={() => onSelect?.(device)}
+      style={{
+        padding: '7px 20px', display: 'flex', alignItems: 'center', gap: 8,
+        borderBottom: '1px solid #1e293b',
+        opacity: device.online === false ? 0.45 : 1,
+        cursor: 'pointer', background: active ? '#0f172a' : 'transparent',
+      }}
+    >
       <Icon size={16} color={device.color} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 11, fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
