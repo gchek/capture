@@ -67,6 +67,7 @@ const en = {
 
   // Privacy score
   ai_explain_btn: 'Explain with AI',
+  ai_ask_host_btn: 'Ask AI about this host',
   ai_explaining: 'Analyzing…',
   ai_failed: 'AI request failed. Try again.',
   ai_no_key: path => `Add a Claude credential to enable this: add ANTHROPIC_API_KEY=... or CLAUDE_CODE_OAUTH_TOKEN=... to ${path}`,
@@ -203,6 +204,7 @@ const fr = {
 
   // Privacy score
   ai_explain_btn: "Expliquer avec l'IA",
+  ai_ask_host_btn: "Demander à l'IA (cet hôte)",
   ai_explaining: 'Analyse…',
   ai_failed: 'La requête IA a échoué. Réessayez.',
   ai_no_key: path => `Ajoutez un identifiant Claude pour activer ceci : ajoutez ANTHROPIC_API_KEY=... ou CLAUDE_CODE_OAUTH_TOKEN=... dans ${path}`,

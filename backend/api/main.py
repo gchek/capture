@@ -16,7 +16,7 @@ from resolver.dns_geo import enrich_ip, resolve_self_geo
 from scanner.arp_scanner import ARPScanner, Device
 from detection.anomaly import AnomalyDetector
 import storage.db as db
-from ai.explain import NoKey, explain_privacy
+from ai.explain import NoKey, explain_host, explain_privacy
 
 # ── State ─────────────────────────────────────────────────────────────────────
 nodes: dict[str, dict] = {}
@@ -301,6 +301,19 @@ async def ai_explain_privacy(body: dict):
         text = await explain_privacy(
             nodes, detector.history, int(body.get("score", 0)), str(body.get("grade", "")), body.get("lang", "en")
         )
+    except NoKey as e:
+        return JSONResponse({"error": "no_key", "key_file": str(e)}, status_code=503)
+    except Exception as e:
+        return JSONResponse({"error": "ai_failed", "detail": str(e)[:200]}, status_code=502)
+    return {"text": text}
+
+@app.post("/ai/explain-host")
+async def ai_explain_host(body: dict):
+    node = nodes.get(body.get("node_id")) or lan_devices.get(body.get("node_id"))
+    if not node:
+        return JSONResponse({"error": "unknown_host"}, status_code=404)
+    try:
+        text = await explain_host(node, detector.history, body.get("lang", "en"))
     except NoKey as e:
         return JSONResponse({"error": "no_key", "key_file": str(e)}, status_code=503)
     except Exception as e:

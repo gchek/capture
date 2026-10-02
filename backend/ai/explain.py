@@ -32,6 +32,17 @@ SYSTEM = (
     "preamble. Plain text only: no markdown, no asterisks, no backticks, no headings; use short paragraphs and lines starting with a dash for lists. Answer in the requested language."
 )
 
+HOST_SYSTEM = (
+    "You are a network privacy advisor inside a traffic visualizer used by non-experts. "
+    "You get one connection (a remote host or a local device) seen from this Mac: hostname, "
+    "organisation, country, traffic volume, the processes using it and any alerts. Say what "
+    "it most likely is, whether it looks normal or deserves attention, and what to do if it "
+    "does (e.g. which app to check, block it, ignore it). Be honest about uncertainty: if the "
+    "name or organisation does not identify it, say so instead of guessing. Under 150 words, "
+    "no preamble. Plain text only: no markdown, no asterisks, no backticks, no headings; use "
+    "short paragraphs. Answer in the requested language."
+)
+
 
 class NoKey(Exception):
     pass
@@ -78,10 +89,10 @@ def build_summary(nodes: dict, alerts: list, score: int, grade: str) -> dict:
     }
 
 
-def _call(summary: dict, lang: str) -> str:
+def _call(system_prompt: str, summary: dict, lang: str) -> str:
     secret, oauth = _credential()
     # The Messages API accepts a subscription OAuth token only with this beta header and Claude Code identity block.
-    system = [{"type": "text", "text": OAUTH_IDENTITY}, {"type": "text", "text": SYSTEM}] if oauth else SYSTEM
+    system = [{"type": "text", "text": OAUTH_IDENTITY}, {"type": "text", "text": system_prompt}] if oauth else system_prompt
     body = json.dumps({
         "model": MODEL,
         "max_tokens": 1500,
@@ -104,4 +115,31 @@ def _call(summary: dict, lang: str) -> str:
 
 async def explain_privacy(nodes: dict, alerts: list, score: int, grade: str, lang: str) -> str:
     summary = build_summary(nodes, alerts, score, grade)
-    return await asyncio.get_running_loop().run_in_executor(None, _call, summary, lang)
+    return await asyncio.get_running_loop().run_in_executor(None, _call, SYSTEM, summary, lang)
+
+
+def build_host_summary(node: dict, alerts: list) -> dict:
+    """One connection. For a local device the MAC address is left out."""
+    return {
+        "host": node.get("label") or node.get("hostname"),
+        "ip": node.get("ip"),
+        "org": node.get("org") or node.get("vendor"),
+        "country": node.get("country"),
+        "city": node.get("city"),
+        "category": node.get("category") or node.get("device_type"),
+        "traffic_kb": round(node.get("bytes", 0) / 1024),
+        "packets": node.get("packets"),
+        "processes": {
+            name: round(st["bytes"] / 1024)
+            for name, st in sorted((node.get("processes") or {}).items(), key=lambda kv: -kv[1]["bytes"])[:5]
+        },
+        "alerts": [
+            {"type": a.get("type"), "severity": a.get("severity"), "message": a.get("message")}
+            for a in alerts if a.get("node_id") == node.get("id")
+        ][-5:],
+    }
+
+
+async def explain_host(node: dict, alerts: list, lang: str) -> str:
+    summary = build_host_summary(node, alerts)
+    return await asyncio.get_running_loop().run_in_executor(None, _call, HOST_SYSTEM, summary, lang)

@@ -2,6 +2,7 @@ import { Wifi, Smartphone, Monitor, Tv, Cpu, HelpCircle, ShieldOff } from 'lucid
 import PrivacyScore from './PrivacyScore'
 import BandwidthChart from './BandwidthChart'
 import SearchBar from './SearchBar'
+import AskAI from './AskAI'
 import { useT } from '../i18n'
 
 const DEVICE_ICONS = {
@@ -219,6 +220,8 @@ function NodeDetail({ node, onWhitelist }) {
           ))}
         </>
       )}
+
+      {node.id !== 'local' && <AskAI key={node.id} endpoint="/ai/explain-host" body={{ node_id: node.id }} label={t('ai_ask_host_btn')} />}
 
       {node.id !== 'local' && node.ip && onWhitelist && (
         <button onClick={() => onWhitelist(node.ip)} style={{

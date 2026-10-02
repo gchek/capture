@@ -8,6 +8,10 @@
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
       body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+      /* macOS hides overlay scrollbars at rest; keep this one visible. */
+      .scroll-visible::-webkit-scrollbar { width: 6px; }
+      .scroll-visible::-webkit-scrollbar-track { background: #0f172a; border-radius: 3px; }
+      .scroll-visible::-webkit-scrollbar-thumb { background: #64748b; border-radius: 3px; }
     </style>
   </head>
   <body>
