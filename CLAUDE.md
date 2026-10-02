@@ -6,6 +6,7 @@ Fork of [Mister-iks/pcybox-orbis](https://github.com/Mister-iks/pcybox-orbis) (A
 
 - `backend/` — FastAPI + Scapy. `api/main.py` (REST + `/ws` websocket + state), `capture/sniffer.py`, `detection/anomaly.py`, `resolver/dns_geo.py`, `scanner/` (ARP + OUI), `storage/db.py` (SQLite).
 - `frontend/` — React + D3 (`graph/ForceGraph.jsx`, `map/MapView.jsx`, `hooks/useWebSocket.js`, `App.jsx`). Vite proxies API calls to `:8000` in dev.
+- `backend/ai/explain.py` — opt-in "Explain with AI" for the privacy score (`POST /ai/explain-privacy`, button in `PrivacyScore.jsx`). Calls the Anthropic API with urllib (no SDK) and sends metadata only (hostnames or remote IPs, process names, counts; no packet contents). Credential = `CLAUDE_CODE_OAUTH_TOKEN` (preferred; sent as Bearer with the oauth beta header and a Claude Code identity block, like sefarim's `providers.py`) or `ANTHROPIC_API_KEY`, from the environment or a `.env` file: repo root from source, `~/Library/Application Support/pcybox-orbis/data/.env` when packaged. Without a key the UI shows where to put it.
 - `electron/` — desktop wrapper. On macOS it starts the backend as root through an `osascript` admin prompt.
 - `run-mac.sh` (dev), `build-mac.sh` (app + DMG), `backend/backend-mac.spec` (PyInstaller).
 

@@ -81,6 +81,22 @@ Then open http://localhost:5173.
 
 The app is ad-hoc signed, not notarized, so macOS blocks the first launch; [MAC-INSTALL.md](MAC-INSTALL.md) explains how to open it. Notarization needs a Developer ID certificate.
 
+## AI explanation of the privacy score (optional)
+
+The privacy score panel has an **Explain with AI** button. It asks Claude to say, in plain language, why your score is what it is, which apps are responsible and what to do about it. It is off until you provide a Claude credential: either a Claude subscription token (`CLAUDE_CODE_OAUTH_TOKEN`, from `claude setup-token`) or an [Anthropic API key](https://console.anthropic.com/) (`ANTHROPIC_API_KEY`):
+
+1. Create a `.env` file:
+   - From source: in the repo root (next to `run-mac.sh`)
+   - Packaged app: `~/Library/Application Support/pcybox-orbis/data/.env`
+2. Put one of these in it:
+   ```
+   CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat...
+   ANTHROPIC_API_KEY=sk-ant-api...
+   ```
+   One is enough. If both are set, the subscription token is used. (You can also export either variable in the shell before `./run-mac.sh`.)
+
+`.env` is git-ignored, so the key is never committed. The file is read on each click, so no restart is needed. Only metadata is sent: hostnames (or the remote server's IP when it has no name), process names and counts. Never packet contents or your own IP, and only when you click the button.
+
 ## Geolocation and privacy
 
 Without a MaxMind `GeoLite2-City.mmdb` in `data/`, each remote IP is sent to [ip-api.com](https://ip-api.com) (plain HTTP, 45 lookups per minute) to find its location, and one extra lookup finds where "You" are. Put a GeoLite2 database in `data/` to keep lookups offline.

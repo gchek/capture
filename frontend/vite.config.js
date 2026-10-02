@@ -15,6 +15,7 @@ export default defineConfig({
       '/capture':  { target: 'http://localhost:8000' },
       '/media':    { target: 'http://localhost:8000' },
       '/me':       { target: 'http://localhost:8000' },
+      '/ai':       { target: 'http://localhost:8000' },
     },
   },
 })

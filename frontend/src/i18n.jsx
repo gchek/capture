@@ -66,6 +66,10 @@ const en = {
   time_hours: n => `${n}h ago`,
 
   // Privacy score
+  ai_explain_btn: 'Explain with AI',
+  ai_explaining: 'Analyzing…',
+  ai_failed: 'AI request failed. Try again.',
+  ai_no_key: path => `Add your Anthropic API key to enable this: add ANTHROPIC_API_KEY=... to ${path}`,
   privacy_title: 'Privacy Score',
   privacy_critical_label: 'Critical',
   privacy_excellent_label: 'Excellent',
@@ -198,6 +202,10 @@ const fr = {
   time_hours: n => `il y a ${n}h`,
 
   // Privacy score
+  ai_explain_btn: "Expliquer avec l'IA",
+  ai_explaining: 'Analyse…',
+  ai_failed: 'La requête IA a échoué. Réessayez.',
+  ai_no_key: path => `Ajoutez votre clé API Anthropic pour activer ceci : ajoutez ANTHROPIC_API_KEY=... dans ${path}`,
   privacy_title: 'Privacy Score',
   privacy_critical_label: 'Critique',
   privacy_excellent_label: 'Excellent',

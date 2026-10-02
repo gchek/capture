@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from capture.sniffer import Packet, PacketSniffer
@@ -15,6 +16,7 @@ from resolver.dns_geo import enrich_ip, resolve_self_geo
 from scanner.arp_scanner import ARPScanner, Device
 from detection.anomaly import AnomalyDetector
 import storage.db as db
+from ai.explain import NoKey, explain_privacy
 
 # ── State ─────────────────────────────────────────────────────────────────────
 nodes: dict[str, dict] = {}
@@ -292,6 +294,18 @@ async def get_devices() -> dict:
 @app.get("/alerts")
 async def get_alerts() -> dict:
     return {"alerts": detector.history[-100:]}
+
+@app.post("/ai/explain-privacy")
+async def ai_explain_privacy(body: dict):
+    try:
+        text = await explain_privacy(
+            nodes, detector.history, int(body.get("score", 0)), str(body.get("grade", "")), body.get("lang", "en")
+        )
+    except NoKey as e:
+        return JSONResponse({"error": "no_key", "key_file": str(e)}, status_code=503)
+    except Exception as e:
+        return JSONResponse({"error": "ai_failed", "detail": str(e)[:200]}, status_code=502)
+    return {"text": text}
 
 @app.get("/me")
 async def my_location() -> dict:

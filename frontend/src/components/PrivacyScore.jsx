@@ -3,7 +3,10 @@ import {
   AlertTriangle, Unlock, ShieldAlert, Bell,
   Lock, CheckCircle2,
 } from 'lucide-react'
+import { useState } from 'react'
+import { Sparkles } from 'lucide-react'
 import { useT } from '../i18n'
+import { API_BASE } from '../api'
 
 const SCORE_ICONS = {
   'radio':          Radio,
@@ -23,7 +26,25 @@ const CIRC = 2 * Math.PI * R
 const STROKE = 7
 
 export default function PrivacyScore({ score, grade, color, labelKey, factors }) {
-  const { t } = useT()
+  const { t, lang } = useT()
+  const [ai, setAi] = useState(null)   // { loading } | { text } | { error }
+
+  async function explain() {
+    setAi({ loading: true })
+    try {
+      const r = await fetch(`${API_BASE}/ai/explain-privacy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score, grade, lang }),
+      })
+      const data = await r.json()
+      if (r.ok) setAi({ text: data.text })
+      else if (data.error === 'no_key') setAi({ error: t('ai_no_key', data.key_file) })
+      else setAi({ error: t('ai_failed') })
+    } catch {
+      setAi({ error: t('ai_failed') })
+    }
+  }
   const filled   = (score / 100) * CIRC
   const badCount = factors.filter(f => f.bad).length
 
@@ -106,6 +127,29 @@ export default function PrivacyScore({ score, grade, color, labelKey, factors })
           <span style={{ fontSize: 8, color: '#22c55e' }}>{t('privacy_excellent_label')}</span>
         </div>
       </div>
+
+      <button
+        onClick={explain}
+        disabled={ai?.loading}
+        style={{
+          marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          padding: '6px 0', fontSize: 11, color: '#cbd5e1', background: '#1e293b',
+          border: '1px solid #334155', borderRadius: 6, cursor: ai?.loading ? 'default' : 'pointer',
+        }}
+      >
+        <Sparkles size={12} />
+        {ai?.loading ? t('ai_explaining') : t('ai_explain_btn')}
+      </button>
+      {ai?.text && (
+        <div style={{ marginTop: 10, fontSize: 11, lineHeight: 1.5, color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>
+          {ai.text}
+        </div>
+      )}
+      {ai?.error && (
+        <div style={{ marginTop: 10, fontSize: 10, lineHeight: 1.5, color: '#f59e0b', wordBreak: 'break-all' }}>
+          {ai.error}
+        </div>
+      )}
     </div>
   )
 }
