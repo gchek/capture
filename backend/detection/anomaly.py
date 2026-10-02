@@ -146,24 +146,26 @@ class AnomalyDetector:
 
         if is_new:
             key = f"new_device:{device.ip}"
+            name = device.hostname or device.vendor or device.ip
             alert = Alert(
                 type="NEW_LAN_DEVICE",
                 severity="info",
-                message=f"Nouveau device sur le réseau : {device.hostname or device.vendor or device.ip}",
+                message=f"New device on the network: {name}",
                 node_id=f"lan:{device.ip}",
-                details={"ip": device.ip, "mac": device.mac, "vendor": device.vendor},
+                details={"ip": device.ip, "mac": device.mac, "vendor": device.vendor, "label": name},
             )
             if self._cooldown_ok(key):
                 alerts.append(alert)
 
         elif not device.online:
             key = f"offline:{device.ip}"
+            name = device.hostname or device.ip
             alert = Alert(
                 type="DEVICE_OFFLINE",
                 severity="info",
-                message=f"Device hors ligne : {device.hostname or device.ip}",
+                message=f"Device offline: {name}",
                 node_id=f"lan:{device.ip}",
-                details={"ip": device.ip},
+                details={"ip": device.ip, "label": name},
             )
             if self._cooldown_ok(key):
                 alerts.append(alert)
@@ -183,9 +185,9 @@ class AnomalyDetector:
         return [Alert(
             type="NEW_HOST",
             severity="info",
-            message=f"Nouvel hôte contacté : {label}",
+            message=f"New host contacted: {label}",
             node_id=ip,
-            details={"ip": ip, "org": org, "country": country},
+            details={"ip": ip, "org": org, "country": country, "label": label},
         )]
 
     def _check_suspicious_process(self, pkt: Packet, remote_ip: str, geo: dict) -> list[Alert]:
@@ -202,9 +204,9 @@ class AnomalyDetector:
         return [Alert(
             type="SUSPICIOUS_PROCESS",
             severity="warning",
-            message=f"Processus suspect : {pkt.process_name} → {label}",
+            message=f"Suspicious process: {pkt.process_name} → {label}",
             node_id=remote_ip,
-            details={"process": pkt.process_name, "ip": remote_ip, "port": pkt.dst_port},
+            details={"process": pkt.process_name, "ip": remote_ip, "port": pkt.dst_port, "label": label},
         )]
 
     def _check_suspicious_port(self, pkt: Packet, remote_ip: str, geo: dict) -> list[Alert]:
@@ -219,9 +221,9 @@ class AnomalyDetector:
         return [Alert(
             type="SUSPICIOUS_PORT",
             severity="warning",
-            message=f"Port suspect {port} ({reason}) → {label}",
+            message=f"Suspicious port {port} ({reason}) → {label}",
             node_id=remote_ip,
-            details={"port": port, "reason": reason, "ip": remote_ip},
+            details={"port": port, "reason": reason, "ip": remote_ip, "label": label},
         )]
 
     def _check_beacon(self, remote_ip: str, pkt: Packet, geo: dict) -> list[Alert]:
@@ -250,9 +252,9 @@ class AnomalyDetector:
         return [Alert(
             type="BEACON",
             severity="warning",
-            message=f"Comportement beacon détecté : une connexion toutes les {mean:.0f}s vers {label}",
+            message=f"Beacon behaviour detected: one connection every {mean:.0f}s to {label}",
             node_id=remote_ip,
-            details={"ip": remote_ip, "interval": round(mean, 1), "jitter": round(stdev / mean, 3), "bursts": len(starts)},
+            details={"ip": remote_ip, "interval": round(mean, 1), "jitter": round(stdev / mean, 3), "bursts": len(starts), "label": label},
         )]
 
     def _check_volume_spike(self, remote_ip: str, size: int, geo: dict) -> list[Alert]:
@@ -270,9 +272,9 @@ class AnomalyDetector:
         return [Alert(
             type="VOLUME_SPIKE",
             severity="warning",
-            message=f"Pic de trafic vers {label} ({size // 1024} KB en un paquet)",
+            message=f"Traffic spike to {label} ({size // 1024} KB in one packet)",
             node_id=remote_ip,
-            details={"ip": remote_ip, "size": size, "avg": int(avg)},
+            details={"ip": remote_ip, "size": size, "avg": int(avg), "label": label},
         )]
 
     def _check_media_exfil(self, pkt: Packet, remote_ip: str, geo: dict) -> list[Alert]:
@@ -295,7 +297,7 @@ class AnomalyDetector:
             severity="critical",
             message=f"Suspected {device} exfiltration: {pkt.process_name} → {label}",
             node_id=remote_ip,
-            details={"process": pkt.process_name, "device": device, "ip": remote_ip, "org": geo.get("org", "")},
+            details={"process": pkt.process_name, "device": device, "ip": remote_ip, "org": geo.get("org", ""), "label": label},
         )]
 
     # ── Helpers ──────────────────────────────────────────────────────────────

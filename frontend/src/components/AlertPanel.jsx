@@ -90,6 +90,13 @@ export function AlertPanel({ alerts, onClose }) {
   )
 }
 
+// Localised message built from the alert's details; alerts logged before details.label existed keep their stored text.
+function alertText(t, alert) {
+  const key = `alertmsg_${alert.type}`
+  const text = alert.details?.label ? t(key, alert.details) : key
+  return text !== key ? text : alert.message
+}
+
 function AlertRow({ alert }) {
   const { t } = useT()
   const sev      = SEVERITY_STYLES[alert.severity] || SEVERITY_STYLES.info
@@ -112,7 +119,7 @@ function AlertRow({ alert }) {
                 {typeLabel}
               </span>
             </div>
-            <div style={{ fontSize: 11, color: '#e2e8f0', lineHeight: 1.4 }}>{alert.message}</div>
+            <div style={{ fontSize: 11, color: '#e2e8f0', lineHeight: 1.4 }}>{alertText(t, alert)}</div>
             {alert.details && Object.keys(alert.details).length > 0 && (
               <div style={{ marginTop: 3, fontSize: 9, color: '#64748b', fontFamily: 'monospace' }}>
                 {Object.entries(alert.details).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(' · ')}
@@ -215,7 +222,7 @@ function Toast({ alert, index, dying }) {
       <TypeIcon size={12} color={sev.color} style={{ flexShrink: 0 }} />
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 9, color: sev.color, fontWeight: 700, textTransform: 'uppercase' }}>{typeLabel}</div>
-        <div style={{ fontSize: 10, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alert.message}</div>
+        <div style={{ fontSize: 10, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{alertText(t, alert)}</div>
       </div>
     </div>
   )
